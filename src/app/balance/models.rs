@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -7,8 +7,8 @@ pub struct Balance {
     pub id: i32,
     pub user_id: i64,
     pub balance: f64,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -28,7 +28,7 @@ pub struct BalanceHistory {
     pub balance_id: i32,
     pub balance: f64,
     pub top_up: f64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,8 +47,8 @@ impl Balance {
         let balance = sqlx::query_as::<_, Self>(
             r#"
             INSERT INTO balances (user_id, balance)
-            VALUES ($1, $2)
-            RETURNING id, user_id, balance, created_at, updated_at
+            VALUES ($1, 0)
+            RETURNING *
             "#,
         )
         .bind(new_balance.user_id)

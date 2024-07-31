@@ -1,4 +1,4 @@
-use actix_web::web;
+use actix_web::{guard, web};
 
 pub fn register_urls(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -6,7 +6,6 @@ pub fn register_urls(cfg: &mut web::ServiceConfig) {
             .route("/login", web::post().to(super::views::login))
             .route("/register", web::post().to(super::views::register))
             .route("/logout", web::post().to(super::views::logout))
-            .route("/profile", web::get().to(super::views::get_profile))
-            .route("/refresh", web::post().to(super::views::refresh_token)),
+            .route("/profile", web::get().to(super::views::get_profile)),
     );
 }

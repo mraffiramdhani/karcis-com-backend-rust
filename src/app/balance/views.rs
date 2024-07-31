@@ -8,7 +8,7 @@ pub async fn get_balance(db: web::Data<PgPool>, path: web::Path<i64>) -> impl Re
     let balance_id = path.into_inner();
 
     match Balance::get_by_user(&db, balance_id).await {
-        Ok(balance) => HttpResponse::Ok().json(StandardResponse::ok(Some(balance))),
+        Ok(balance) => HttpResponse::Ok().json(StandardResponse::ok(Some(balance), None)),
         Err(_) => HttpResponse::NotFound().finish(),
     }
 }
@@ -18,7 +18,7 @@ pub async fn get_balance_histories(db: web::Data<PgPool>, path: web::Path<i64>) 
 
     match BalanceHistory::get_by_user(&db, user_id).await {
         Ok(balance_histories) => {
-            HttpResponse::Ok().json(StandardResponse::ok(Some(balance_histories)))
+            HttpResponse::Ok().json(StandardResponse::ok(Some(balance_histories), None))
         }
         Err(_) => HttpResponse::NotFound().finish(),
     }
@@ -51,7 +51,7 @@ pub async fn update_balance(
                 )
                 .await
                 {
-                    Ok(_) => HttpResponse::Ok().json(StandardResponse::ok(Some(balance))),
+                    Ok(_) => HttpResponse::Ok().json(StandardResponse::ok(Some(balance), None)),
                     Err(_) => HttpResponse::NotFound().finish(),
                 },
                 Err(_) => HttpResponse::NotFound().finish(),

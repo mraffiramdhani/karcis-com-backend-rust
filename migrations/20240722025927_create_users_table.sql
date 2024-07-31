@@ -1,6 +1,6 @@
 -- Add migration script here
 CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     first_name VARCHAR(255),
     last_name VARCHAR(255),
     phone VARCHAR(255),
