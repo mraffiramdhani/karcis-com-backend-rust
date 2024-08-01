@@ -1,5 +1,7 @@
 pub mod auth;
 pub mod balance;
+pub mod mail_template;
+pub mod otp;
 pub mod utils;
 
 pub fn register_urls(cfg: &mut actix_web::web::ServiceConfig) {

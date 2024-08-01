@@ -1,7 +1,7 @@
 use bcrypt::{hash, verify};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{FromRow, PgPool, Postgres, Transaction};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
@@ -35,6 +35,11 @@ pub struct RegisterUser {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ForgotPassword {
+    pub email: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Profile {
     pub id: i64,
     pub first_name: String,
@@ -54,8 +59,21 @@ pub struct Token {
 }
 
 impl User {
+    pub async fn find_by(
+        pool: &PgPool,
+        field: &str,
+        value: &str,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        let query = format!("SELECT * FROM users WHERE {} = $1", field);
+        let result = sqlx::query_as::<_, Self>(&query)
+            .bind(value)
+            .fetch_optional(pool)
+            .await;
+        result
+    }
+
     pub async fn find_by_username_or_email(
-        pool: &sqlx::PgPool,
+        pool: &PgPool,
         username: &str,
         email: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
@@ -65,10 +83,25 @@ impl User {
                 .bind(email)
                 .fetch_optional(pool)
                 .await;
-        result // Ensure the result is returned directly
+        result
     }
 
-    pub async fn create(pool: &sqlx::PgPool, user: &RegisterUser) -> Result<Self, sqlx::Error> {
+    pub async fn find_by_username(
+        pool: &PgPool,
+        username: &str,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        let result = sqlx::query_as::<_, Self>("SELECT * FROM users WHERE username = $1")
+            .bind(username)
+            .fetch_optional(pool)
+            .await;
+        result
+    }
+
+    pub async fn create(
+        transaction: &mut Transaction<'_, Postgres>,
+        user: &RegisterUser,
+    ) -> Result<Self, sqlx::Error> {
+        let password_hash = hash(&user.password, 10).unwrap();
         let result = sqlx::query_as::<_, Self>(
             "INSERT INTO users (first_name, last_name, phone, username, email, password_hash, title, image) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
         )
@@ -77,12 +110,12 @@ impl User {
         .bind(&user.phone)
         .bind(&user.username)
         .bind(&user.email)
-        .bind(&hash(&user.password, 10).unwrap())
+        .bind(&password_hash)
         .bind(&user.title)
         .bind(&user.image)
-        .fetch_one(pool)
+        .fetch_one(&mut **transaction)
         .await;
-        result // Ensure the result is returned directly
+        result
     }
 
     pub async fn find_by_id(pool: &sqlx::PgPool, id: i64) -> Result<Option<Self>, sqlx::Error> {
@@ -90,7 +123,7 @@ impl User {
             .bind(id)
             .fetch_optional(pool)
             .await;
-        result // Ensure the result is returned directly
+        result
     }
 
     pub fn verify_password(&self, password: &str) -> bool {
@@ -99,27 +132,42 @@ impl User {
 }
 
 impl Token {
-    pub async fn create(pool: &sqlx::PgPool, token: &str) -> Result<Self, sqlx::Error> {
-        sqlx::query_as::<_, Self>("INSERT INTO revoked_token (token) VALUES ($1) RETURNING *")
-            .bind(token)
-            .fetch_one(pool)
-            .await
+    pub async fn create(
+        transaction: &mut Transaction<'_, Postgres>,
+        token: &str,
+    ) -> Result<Self, sqlx::Error> {
+        let result =
+            sqlx::query_as::<_, Self>("INSERT INTO revoked_token (token) VALUES ($1) RETURNING *")
+                .bind(token)
+                .fetch_one(&mut **transaction)
+                .await;
+        result
     }
 
-    pub async fn is_token_revoked(pool: &sqlx::PgPool, token: &str) -> Result<bool, sqlx::Error> {
+    pub async fn is_token_revoked(
+        transaction: &mut Transaction<'_, Postgres>,
+        token: &str,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS(SELECT 1 FROM revoked_token WHERE token = $1 AND is_revoked = true)",
         )
         .bind(token)
-        .fetch_one(pool)
+        .fetch_one(&mut **transaction)
         .await?;
         Ok(result)
     }
 
-    pub async fn revoke_token(pool: &sqlx::PgPool, token: &str) -> Result<Self, sqlx::Error> {
-        sqlx::query_as::<_, Self>("UPDATE revoked_token SET is_revoked = true WHERE token = $1")
-            .bind(token)
-            .fetch_one(pool)
+    pub async fn revoke_token(
+        transaction: &mut Transaction<'_, Postgres>,
+        token: String,
+    ) -> Result<u64, sqlx::Error> {
+        match sqlx::query("UPDATE revoked_token SET is_revoked = true WHERE token = $1")
+            .bind(&token)
+            .execute(&mut **transaction)
             .await
+        {
+            Ok(row) => Ok(row.rows_affected()),
+            Err(e) => Err(e),
+        }
     }
 }

@@ -1,7 +1,8 @@
-use crate::app::utils::StandardResponse;
+use crate::app::utils::standard_response::StandardResponse;
 
 use super::models::{Balance, BalanceHistory, CreateBalanceHistory, UpdateBalance};
 use actix_web::{web, HttpResponse, Responder};
+use bigdecimal::BigDecimal;
 use sqlx::PgPool;
 
 pub async fn get_balance(db: web::Data<PgPool>, path: web::Path<i64>) -> impl Responder {
@@ -26,32 +27,32 @@ pub async fn get_balance_histories(db: web::Data<PgPool>, path: web::Path<i64>) 
 
 pub async fn update_balance(
     db: web::Data<PgPool>,
-    path: web::Path<i32>,
+    path: web::Path<i64>,
     body: web::Json<UpdateBalance>,
 ) -> impl Responder {
     let balance_id = path.into_inner();
 
-    match Balance::get(&db, balance_id).await {
+    match Balance::get(&db, &balance_id).await {
         Ok(balance) => {
             let update_balance = body.into_inner();
             let top_up_nominal = if update_balance.balance > balance.balance {
-                update_balance.balance - balance.balance
+                &update_balance.balance - &balance.balance
             } else {
-                0.0
+                BigDecimal::from(0)
             };
-            match Balance::update(&db, balance_id, update_balance).await {
+            match Balance::update(&db, &balance_id, &update_balance).await {
                 Ok(_) => match BalanceHistory::create(
                     &db,
                     CreateBalanceHistory {
-                        user_id: balance.user_id,
-                        balance_id: balance.id,
-                        balance: balance.balance,
-                        top_up: top_up_nominal,
+                        user_id: balance.user_id.clone(),
+                        balance_id: balance.id.clone(),
+                        balance: balance.balance.clone(),
+                        top_up: top_up_nominal.clone(),
                     },
                 )
                 .await
                 {
-                    Ok(_) => HttpResponse::Ok().json(StandardResponse::ok(Some(balance), None)),
+                    Ok(_) => HttpResponse::Ok().json(StandardResponse::ok(Some(&balance), None)),
                     Err(_) => HttpResponse::NotFound().finish(),
                 },
                 Err(_) => HttpResponse::NotFound().finish(),

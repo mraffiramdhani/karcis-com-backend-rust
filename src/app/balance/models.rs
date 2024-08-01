@@ -1,12 +1,14 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
-use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use bigdecimal::BigDecimal;
+use chrono::NaiveDateTime;
+use serde::*;
+use sqlx::{FromRow, Postgres, Transaction};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Balance {
-    pub id: i32,
+    pub id: i64,
     pub user_id: i64,
-    pub balance: f64,
+    #[serde(with = "bigdecimal::serde::json_num")]
+    pub balance: BigDecimal,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
@@ -18,31 +20,36 @@ pub struct CreateBalance {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateBalance {
-    pub balance: f64,
+    #[serde(with = "bigdecimal::serde::json_num")]
+    pub balance: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct BalanceHistory {
-    pub id: i32,
+    pub id: i64,
     pub user_id: i64,
-    pub balance_id: i32,
-    pub balance: f64,
-    pub top_up: f64,
+    pub balance_id: i64,
+    #[serde(with = "bigdecimal::serde::json_num")]
+    pub balance: BigDecimal,
+    #[serde(with = "bigdecimal::serde::json_num")]
+    pub top_up: BigDecimal,
     pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateBalanceHistory {
     pub user_id: i64,
-    pub balance_id: i32,
-    pub balance: f64,
-    pub top_up: f64,
+    pub balance_id: i64,
+    #[serde(with = "bigdecimal::serde::json_num")]
+    pub balance: BigDecimal,
+    #[serde(with = "bigdecimal::serde::json_num")]
+    pub top_up: BigDecimal,
 }
 
 impl Balance {
     pub async fn create(
-        db: &sqlx::PgPool,
-        new_balance: CreateBalance,
+        transaction: &mut Transaction<'_, Postgres>,
+        user_id: &i64,
     ) -> Result<Self, sqlx::Error> {
         let balance = sqlx::query_as::<_, Self>(
             r#"
@@ -51,14 +58,14 @@ impl Balance {
             RETURNING *
             "#,
         )
-        .bind(new_balance.user_id)
-        .fetch_one(db)
+        .bind(&user_id)
+        .fetch_one(&mut **transaction)
         .await?;
 
         Ok(balance)
     }
 
-    pub async fn get(db: &sqlx::PgPool, id: i32) -> Result<Self, sqlx::Error> {
+    pub async fn get(db: &sqlx::PgPool, id: &i64) -> Result<Self, sqlx::Error> {
         let balance = sqlx::query_as::<_, Balance>(
             r#"
             SELECT id, user_id, balance, created_at, updated_at
@@ -66,7 +73,7 @@ impl Balance {
             WHERE id = $1
             "#,
         )
-        .bind(id)
+        .bind(&id)
         .fetch_one(db)
         .await?;
 
@@ -90,8 +97,8 @@ impl Balance {
 
     pub async fn update(
         db: &sqlx::PgPool,
-        id: i32,
-        update: UpdateBalance,
+        id: &i64,
+        update: &UpdateBalance,
     ) -> Result<Self, sqlx::Error> {
         let balance = sqlx::query_as::<_, Self>(
             r#"
@@ -101,15 +108,15 @@ impl Balance {
             RETURNING id, user_id, balance, created_at, updated_at
             "#,
         )
-        .bind(update.balance)
-        .bind(id)
+        .bind(&update.balance)
+        .bind(&id)
         .fetch_one(db)
         .await?;
 
         Ok(balance)
     }
 
-    pub async fn delete(db: &sqlx::PgPool, id: i32) -> Result<(), sqlx::Error> {
+    pub async fn delete(db: &sqlx::PgPool, id: i64) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
             DELETE FROM balances
@@ -146,7 +153,7 @@ impl BalanceHistory {
         Ok(balance_history)
     }
 
-    pub async fn get(db: &sqlx::PgPool, id: i32) -> Result<Self, sqlx::Error> {
+    pub async fn get(db: &sqlx::PgPool, id: i64) -> Result<Self, sqlx::Error> {
         let balance_history = sqlx::query_as::<_, Self>(
             r#"
             SELECT id, user_id, balance_id, balance, top_up, created_at
