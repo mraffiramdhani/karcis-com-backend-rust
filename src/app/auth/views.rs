@@ -2,7 +2,7 @@ use crate::app::auth::models::{LoginCredentials, Profile, RegisterUser, Token, U
 use crate::app::balance::models::Balance;
 use crate::app::mail_template::forgot_password::template;
 use crate::app::otp::models::OTP;
-use crate::app::utils::generator::generateOTP;
+use crate::app::utils::generator::generate_otp;
 use crate::app::utils::mail::send_mail;
 use crate::app::utils::{standard_response::StandardResponse, token_signing::TokenSigning};
 use crate::db::DbPool;
@@ -10,7 +10,7 @@ use actix_web::HttpRequest;
 use actix_web::{http::header, web, HttpResponse, Responder};
 use serde_json::json;
 
-use super::models::ForgotPassword;
+use super::models::{CheckOTP, ForgotPassword, ResetPassword};
 
 pub async fn register(
     pool: web::Data<DbPool>,
@@ -52,6 +52,8 @@ pub async fn register(
                                     id: user.id.clone(),
                                     username: user.username.clone(),
                                     email: user.email.clone(),
+                                    title: user.title.clone(),
+                                    image: user.image.clone(),
                                 };
                                 HttpResponse::Created().json(StandardResponse::ok(
                                     json!({"profile": profile, "token": &token}),
@@ -120,6 +122,8 @@ pub async fn login(
                                 id: user.id.clone(),
                                 username: user.username.clone(),
                                 email: user.email.clone(),
+                                image: user.image.clone(),
+                                title: user.title.clone(),
                             };
                             HttpResponse::Ok().json(StandardResponse::ok(
                                 json!({"profile": profile,"token": token_string}),
@@ -183,17 +187,42 @@ pub async fn get_profile(pool: web::Data<DbPool>, user_id: web::Path<i64>) -> im
     match User::find_by_id(&pool, user_id.into_inner()).await {
         Ok(Some(user)) => {
             let profile = Profile {
-                first_name: user.first_name,
-                last_name: user.last_name,
-                phone: user.phone,
-                id: user.id,
-                username: user.username,
-                email: user.email,
+                first_name: user.first_name.clone(),
+                last_name: user.last_name.clone(),
+                phone: user.phone.clone(),
+                id: user.id.clone(),
+                username: user.username.clone(),
+                email: user.email.clone(),
+                image: user.image.clone(),
+                title: user.title.clone(),
             };
             HttpResponse::Ok().json(profile)
         }
         Ok(None) => HttpResponse::NotFound().json("User not found"),
         Err(_) => HttpResponse::InternalServerError().json("Could not retrieve user"),
+    }
+}
+
+pub async fn update_profile(pool: web::Data<DbPool>, data: web::Json<Profile>) -> impl Responder {
+    match pool.begin().await {
+        Ok(mut transaction) => match User::update(&mut transaction, &data).await {
+            Ok(res) => match transaction.commit().await {
+                Ok(()) => HttpResponse::Ok().json(StandardResponse::ok(
+                    res,
+                    Some("Reset password success.".into()),
+                )),
+                Err(e) => HttpResponse::InternalServerError().json(StandardResponse::<()>::error(
+                    format!("DB Transaction Commit Error: {}", e.to_string()),
+                )),
+            },
+            Err(e) => HttpResponse::InternalServerError().json(StandardResponse::<()>::error(
+                format!("Update User Error: {}", e.to_string()),
+            )),
+        },
+        Err(e) => HttpResponse::InternalServerError().json(format!(
+            "DB Transaction Initialization Error: {}",
+            e.to_string()
+        )),
     }
 }
 
@@ -203,7 +232,7 @@ pub async fn forgot_password(
 ) -> impl Responder {
     match User::find_by(&pool, "email", &data.email.as_str()).await {
         Ok(Some(user)) => {
-            let otp_codes = generateOTP().to_string();
+            let otp_codes = generate_otp().to_string();
             match pool.begin().await {
                 Ok(mut tx) => match OTP::create(&mut tx, &otp_codes.as_str(), 1).await {
                     Ok(_) => match send_mail(user, template(&otp_codes.as_str())).await {
@@ -229,6 +258,89 @@ pub async fn forgot_password(
         }
         Err(e) => HttpResponse::InternalServerError().json(StandardResponse::<()>::error(format!(
             "Forgot Password Error: {}",
+            e.to_string()
+        ))),
+    }
+}
+
+pub async fn check_otp(pool: web::Data<DbPool>, data: web::Json<CheckOTP>) -> impl Responder {
+    let code = &data.code;
+    match OTP::check_code(&pool, &code.as_str()).await {
+        Ok(Some(_res)) => match OTP::revoke_code(&pool, &code.as_str()).await {
+            Ok(res) => {
+                if res > 0 {
+                    HttpResponse::Ok().json(StandardResponse::ok(
+                        (),
+                        Some("OTP check success. Your code is valid".to_string()),
+                    ))
+                } else {
+                    HttpResponse::Conflict().json(StandardResponse::<()>::error(
+                        "OTP check failed. Please try again.".to_string(),
+                    ))
+                }
+            }
+            Err(e) => HttpResponse::Conflict().json(StandardResponse::<()>::error(format!(
+                "Revoke Code Error: {}",
+                e.to_string()
+            ))),
+        },
+        Ok(None) => HttpResponse::NotFound()
+            .json(StandardResponse::<()>::error("OTP code not found.".into())),
+        Err(e) => HttpResponse::InternalServerError().json(StandardResponse::<()>::error(format!(
+            "Check OTP Error: {}",
+            e.to_string()
+        ))),
+    }
+}
+
+pub async fn reset_password(
+    pool: web::Data<DbPool>,
+    data: web::Json<ResetPassword>,
+) -> impl Responder {
+    match User::find_by(&pool, "email", &data.email.as_str()).await {
+        Ok(Some(_user)) => {
+            let new_password = &data.new_password;
+            let confirm_password = &data.confirm_password;
+            if &new_password == &confirm_password {
+                match pool.begin().await {
+                    Ok(mut transaction) => {
+                        match User::update_password(&mut transaction, &data.into_inner()).await {
+                            Ok(_res) => match transaction.commit().await {
+                                Ok(()) => HttpResponse::Ok().json(StandardResponse::ok(
+                                    (),
+                                    Some("Reset password success.".into()),
+                                )),
+                                Err(e) => HttpResponse::InternalServerError().json(
+                                    StandardResponse::<()>::error(format!(
+                                        "DB Transaction Commit Error: {}",
+                                        e.to_string()
+                                    )),
+                                ),
+                            },
+                            Err(e) => HttpResponse::InternalServerError().json(
+                                StandardResponse::<()>::error(format!(
+                                    "Update User Error: {}",
+                                    e.to_string()
+                                )),
+                            ),
+                        }
+                    }
+                    Err(e) => HttpResponse::InternalServerError().json(format!(
+                        "DB Transaction Initialization Error: {}",
+                        e.to_string()
+                    )),
+                }
+            } else {
+                HttpResponse::Conflict().json(StandardResponse::<()>::error(
+                    "Password not match. Please try again.".into(),
+                ))
+            }
+        }
+        Ok(None) => HttpResponse::NotFound().json(StandardResponse::<()>::error(
+            "User not found. Please try again.".into(),
+        )),
+        Err(e) => HttpResponse::InternalServerError().json(StandardResponse::<()>::error(format!(
+            "Check Existing User Error: {}",
             e.to_string()
         ))),
     }

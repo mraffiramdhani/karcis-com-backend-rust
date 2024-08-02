@@ -32,13 +32,10 @@ impl OTP {
         result
     }
 
-    pub async fn revoke_code(
-        transaction: &mut Transaction<'_, Postgres>,
-        code: &str,
-    ) -> Result<u64, sqlx::Error> {
+    pub async fn revoke_code(pool: &PgPool, code: &str) -> Result<u64, sqlx::Error> {
         match sqlx::query("UPDATE otp_codes SET is_active = 0 WHERE code = $1 AND is_active = 1 AND expired_at >= CURRENT_DATE")
             .bind(code)
-            .execute(&mut **transaction)
+            .execute(pool)
             .await
         {
             Ok(row) => Ok(row.rows_affected()),

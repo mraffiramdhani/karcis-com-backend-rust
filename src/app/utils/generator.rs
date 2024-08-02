@@ -1,7 +1,7 @@
 use rand::{thread_rng, Rng};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub fn generateOTP() -> u32 {
+pub fn generate_otp() -> u32 {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()

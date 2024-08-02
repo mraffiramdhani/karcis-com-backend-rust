@@ -1,7 +1,7 @@
 use bcrypt::{hash, verify};
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool, Postgres, Transaction};
+use sqlx::{postgres::PgQueryResult, FromRow, PgPool, Postgres, Transaction};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
@@ -40,6 +40,18 @@ pub struct ForgotPassword {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct CheckOTP {
+    pub code: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResetPassword {
+    pub email: String,
+    pub new_password: String,
+    pub confirm_password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Profile {
     pub id: i64,
     pub first_name: String,
@@ -47,6 +59,8 @@ pub struct Profile {
     pub username: String,
     pub email: String,
     pub phone: String,
+    pub title: String,
+    pub image: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -128,6 +142,39 @@ impl User {
 
     pub fn verify_password(&self, password: &str) -> bool {
         verify(password, &self.password_hash).unwrap_or(false)
+    }
+
+    pub async fn update(
+        transaction: &mut Transaction<'_, Postgres>,
+        user: &Profile,
+    ) -> Result<Self, sqlx::Error> {
+        let result = sqlx::query_as::<_, Self>(
+            "UPDATE users SET first_name = $1, last_name = $2, phone = $3, username = $4, email = $5, title = $6, image = $7 WHERE id = $8 RETURNING *",
+        )
+        .bind(&user.first_name)
+        .bind(&user.last_name)
+        .bind(&user.phone)
+        .bind(&user.username)
+        .bind(&user.email)
+        .bind(&user.title)
+        .bind(&user.image)
+        .bind(&user.id)
+        .fetch_one(&mut **transaction)
+        .await;
+        result
+    }
+
+    pub async fn update_password(
+        transaction: &mut Transaction<'_, Postgres>,
+        user: &ResetPassword,
+    ) -> Result<PgQueryResult, sqlx::Error> {
+        let password_hash = hash(&user.new_password, 10).unwrap();
+        let result = sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING *")
+            .bind(&password_hash)
+            .bind(&user.email)
+            .execute(&mut **transaction)
+            .await;
+        result
     }
 }
 
