@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod balance;
 pub mod mail_template;
+pub mod middlewares;
 pub mod otp;
 pub mod utils;
 
