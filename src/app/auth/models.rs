@@ -14,6 +14,7 @@ pub struct User {
     pub title: String,
     pub image: String,
     pub phone: String,
+    pub role_id: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -61,6 +62,7 @@ pub struct Profile {
     pub phone: String,
     pub title: String,
     pub image: String,
+    pub role_id: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]

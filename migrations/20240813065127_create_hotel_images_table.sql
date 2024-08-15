@@ -1,0 +1,8 @@
+-- Add migration script here
+CREATE TABLE hotel_images (
+  id BIGSERIAL PRIMARY KEY,
+  hotel_id BIGINT NOT NULL,
+  filename VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE ON UPDATE CASCADE
+)

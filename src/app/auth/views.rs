@@ -54,6 +54,7 @@ pub async fn register(
                                     email: user.email.clone(),
                                     title: user.title.clone(),
                                     image: user.image.clone(),
+                                    role_id: user.role_id.clone(),
                                 };
                                 HttpResponse::Created().json(StandardResponse::ok(
                                     json!({"profile": profile, "token": &token}),
@@ -124,6 +125,7 @@ pub async fn login(
                                 email: user.email.clone(),
                                 image: user.image.clone(),
                                 title: user.title.clone(),
+                                role_id: user.role_id.clone(),
                             };
                             HttpResponse::Ok().json(StandardResponse::ok(
                                 json!({"profile": profile,"token": token_string}),
@@ -195,6 +197,7 @@ pub async fn get_profile(pool: web::Data<DbPool>, user_id: web::Path<i64>) -> im
                 email: user.email.clone(),
                 image: user.image.clone(),
                 title: user.title.clone(),
+                role_id: user.role_id.clone(),
             };
             HttpResponse::Ok().json(profile)
         }

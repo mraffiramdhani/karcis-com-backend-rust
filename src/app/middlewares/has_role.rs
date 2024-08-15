@@ -6,13 +6,19 @@ use std::{
 use actix_web::{
     body::EitherBody,
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    http::Error,
-    HttpResponse,
+    Error, HttpResponse,
 };
 use futures_util::future::LocalBoxFuture;
 
 pub struct HasRole {
     required_role: String, // {{ edit_1 }} Add a field for the required role
+}
+
+impl HasRole {
+    pub fn new(required_role: String) -> Self {
+        // {{ edit_1 }} Add a constructor to initialize required_role
+        HasRole { required_role }
+    }
 }
 
 impl<S, B> Transform<S, ServiceRequest> for HasRole
