@@ -15,6 +15,7 @@ pub struct User {
     pub image: String,
     pub phone: String,
     pub role_id: i32,
+    pub deleted_at: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
