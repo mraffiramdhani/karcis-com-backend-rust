@@ -10,7 +10,7 @@ use actix_web::HttpRequest;
 use actix_web::{http::header, web, HttpResponse, Responder};
 use serde_json::json;
 
-use super::models::{CheckOTP, ForgotPassword, ResetPassword};
+use super::models::{CheckOTP, ForgotPassword, ResetPassword, UpdateProfile};
 
 pub async fn register(
     pool: web::Data<DbPool>,
@@ -149,14 +149,14 @@ pub async fn login(
                 )),
             }
         }
-        Err(e) => {
-            HttpResponse::InternalServerError().json(StandardResponse::<()>::error(e.to_string()))
-        }
+        Err(e) => HttpResponse::InternalServerError().json(StandardResponse::<()>::error(format!(
+            "Find By Username Error: {}",
+            e.to_string()
+        ))),
     }
 }
 
 pub async fn logout(pool: web::Data<DbPool>, header: HttpRequest) -> impl Responder {
-    // TODO: Implement logout logic
     let token = header
         .headers()
         .get(header::AUTHORIZATION)
@@ -170,10 +170,23 @@ pub async fn logout(pool: web::Data<DbPool>, header: HttpRequest) -> impl Respon
         .to_string();
     match pool.begin().await {
         Ok(mut tx) => match Token::revoke_token(&mut tx, token_str).await {
-            Ok(rows_affected) => HttpResponse::Ok().json(StandardResponse::ok(
-                rows_affected,
-                Some(format!("rows affected: {}", rows_affected)),
-            )),
+            Ok(rows_affected) => {
+                if rows_affected > 0 {
+                    match tx.commit().await {
+                        Ok(()) => HttpResponse::Ok().json(StandardResponse::ok(
+                            rows_affected,
+                            Some(format!("rows affected: {}", rows_affected)),
+                        )),
+                        Err(e) => {
+                            HttpResponse::InternalServerError().json(StandardResponse::<()>::error(
+                                format!("DB Transaction Commit Error: {}", e.to_string()),
+                            ))
+                        }
+                    }
+                } else {
+                    HttpResponse::Unauthorized().finish()
+                }
+            }
             Err(e) => HttpResponse::InternalServerError().json(StandardResponse::<()>::error(
                 format!("Token Revoke Error: {}", e.to_string()),
             )),
@@ -199,21 +212,44 @@ pub async fn get_profile(pool: web::Data<DbPool>, user_id: web::Path<i64>) -> im
                 title: user.title.clone(),
                 role_id: user.role_id.clone(),
             };
-            HttpResponse::Ok().json(profile)
+            HttpResponse::Ok().json(StandardResponse::ok(
+                profile,
+                Some("User found".to_string()),
+            ))
         }
-        Ok(None) => HttpResponse::NotFound().json("User not found"),
-        Err(_) => HttpResponse::InternalServerError().json("Could not retrieve user"),
+        Ok(None) => HttpResponse::NotFound()
+            .json(StandardResponse::<()>::error("User not found.".to_string())),
+        Err(e) => HttpResponse::InternalServerError().json(StandardResponse::<()>::error(format!(
+            "Find User By Id Error: {}",
+            e.to_string()
+        ))),
     }
 }
 
-pub async fn update_profile(pool: web::Data<DbPool>, data: web::Json<Profile>) -> impl Responder {
+pub async fn update_profile(
+    pool: web::Data<DbPool>,
+    data: web::Json<UpdateProfile>,
+) -> impl Responder {
     match pool.begin().await {
         Ok(mut transaction) => match User::update(&mut transaction, &data).await {
-            Ok(res) => match transaction.commit().await {
-                Ok(()) => HttpResponse::Ok().json(StandardResponse::ok(
-                    res,
-                    Some("Reset password success.".into()),
-                )),
+            Ok(user) => match transaction.commit().await {
+                Ok(()) => {
+                    let profile = Profile {
+                        first_name: user.first_name.clone(),
+                        last_name: user.last_name.clone(),
+                        phone: user.phone.clone(),
+                        id: user.id.clone(),
+                        username: user.username.clone(),
+                        email: user.email.clone(),
+                        image: user.image.clone(),
+                        title: user.title.clone(),
+                        role_id: user.role_id.clone(),
+                    };
+                    HttpResponse::Ok().json(StandardResponse::ok(
+                        profile,
+                        Some("Update profile success.".to_string()),
+                    ))
+                }
                 Err(e) => HttpResponse::InternalServerError().json(StandardResponse::<()>::error(
                     format!("DB Transaction Commit Error: {}", e.to_string()),
                 )),
@@ -237,12 +273,26 @@ pub async fn forgot_password(
         Ok(Some(user)) => {
             let otp_codes = generate_otp().to_string();
             match pool.begin().await {
-                Ok(mut tx) => match OTP::create(&mut tx, &otp_codes.as_str(), 1).await {
-                    Ok(_) => match send_mail(user, template(&otp_codes.as_str())).await {
-                        Ok(_) => HttpResponse::Ok().json(StandardResponse::ok(
-                            (),
-                            Some("Email sent successfully.".to_string()),
-                        )),
+                Ok(mut tx) => match OTP::create(&mut tx, &otp_codes.as_str(), 5).await {
+                    Ok(_) => match send_mail(
+                        user,
+                        "You've requested to reset your password",
+                        template(&otp_codes.as_str()),
+                    )
+                    .await
+                    {
+                        Ok(_) => match tx.commit().await {
+                            Ok(()) => HttpResponse::Ok().json(StandardResponse::ok(
+                                (),
+                                Some("Email sent successfully.".to_string()),
+                            )),
+                            Err(e) => HttpResponse::InternalServerError().json(
+                                StandardResponse::<()>::error(format!(
+                                    "DB Transaction Commit Error: {}",
+                                    e.to_string()
+                                )),
+                            ),
+                        },
                         Err(e) => HttpResponse::Conflict().json(StandardResponse::<()>::error(
                             format!("Send Mail Error: {}", e.to_string()),
                         )),
@@ -278,7 +328,8 @@ pub async fn check_otp(pool: web::Data<DbPool>, data: web::Json<CheckOTP>) -> im
                     ))
                 } else {
                     HttpResponse::Conflict().json(StandardResponse::<()>::error(
-                        "OTP check failed. Please try again.".to_string(),
+                        "OTP check failed. Your code is expired or invalid, please try again."
+                            .to_string(),
                     ))
                 }
             }

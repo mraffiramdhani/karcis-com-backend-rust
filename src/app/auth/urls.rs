@@ -18,7 +18,7 @@ pub fn register_urls(cfg: &mut web::ServiceConfig) {
             .route("/otp-check", web::post().to(super::views::check_otp))
             .route(
                 "/logout",
-                web::post().to(super::views::logout).wrap(Authentication),
+                web::get().to(super::views::logout).wrap(Authentication),
             ),
     )
     .service(

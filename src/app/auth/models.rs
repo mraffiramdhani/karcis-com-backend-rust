@@ -15,7 +15,7 @@ pub struct User {
     pub image: String,
     pub phone: String,
     pub role_id: i32,
-    pub deleted_at: NaiveDateTime,
+    pub deleted_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -64,6 +64,18 @@ pub struct Profile {
     pub title: String,
     pub image: String,
     pub role_id: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateProfile {
+    pub id: i64,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub username: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub title: Option<String>,
+    pub image: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -135,7 +147,7 @@ impl User {
         result
     }
 
-    pub async fn find_by_id(pool: &sqlx::PgPool, id: i64) -> Result<Option<Self>, sqlx::Error> {
+    pub async fn find_by_id(pool: &PgPool, id: i64) -> Result<Option<Self>, sqlx::Error> {
         let result = sqlx::query_as::<_, Self>("SELECT * FROM users WHERE id = $1")
             .bind(id)
             .fetch_optional(pool)
@@ -149,7 +161,7 @@ impl User {
 
     pub async fn update(
         transaction: &mut Transaction<'_, Postgres>,
-        user: &Profile,
+        user: &UpdateProfile,
     ) -> Result<Self, sqlx::Error> {
         let result = sqlx::query_as::<_, Self>(
             "UPDATE users SET first_name = $1, last_name = $2, phone = $3, username = $4, email = $5, title = $6, image = $7 WHERE id = $8 RETURNING *",
@@ -172,11 +184,12 @@ impl User {
         user: &ResetPassword,
     ) -> Result<PgQueryResult, sqlx::Error> {
         let password_hash = hash(&user.new_password, 10).unwrap();
-        let result = sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING *")
-            .bind(&password_hash)
-            .bind(&user.email)
-            .execute(&mut **transaction)
-            .await;
+        let result =
+            sqlx::query("UPDATE users SET password_hash = $1 WHERE email = $2 RETURNING *")
+                .bind(&password_hash)
+                .bind(&user.email)
+                .execute(&mut **transaction)
+                .await;
         result
     }
 }
