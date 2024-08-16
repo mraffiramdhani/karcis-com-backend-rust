@@ -193,7 +193,7 @@ pub fn template(otp: &str) -> String {
             <!-- start copy -->
             <tr>
               <td align="left" bgcolor='#ffffff' style="padding: 24px; font-family: 'Source Sans Pro', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 24px;">
-                <p style="margin: 0;">This code only last for 10 minutes. DON'T TELL ANYONE about this code.</p>
+                <p style="margin: 0;">This code only last for 5 minutes. DON'T TELL ANYONE about this code.</p>
               </td>
             </tr>
             <!-- end copy -->

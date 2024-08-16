@@ -17,7 +17,7 @@ impl OTP {
         code: &str,
         expiry_in_min: u8,
     ) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query(format!("INSERT INTO otp_codes (code, expired_at) VALUES ($1, CURRENT_DATE + INTERVAL '{} minute')", &expiry_in_min).as_str()).bind(&code).execute(&mut **transaction).await;
+        let result = sqlx::query(format!("INSERT INTO otp_codes (code, expired_at) VALUES ($1, CURRENT_TIMESTAMP + INTERVAL '{} minute')", &expiry_in_min).as_str()).bind(&code).execute(&mut **transaction).await;
         match result {
             Ok(res) => Ok(res.rows_affected()),
             Err(e) => Err(e),
@@ -33,7 +33,7 @@ impl OTP {
     }
 
     pub async fn revoke_code(pool: &PgPool, code: &str) -> Result<u64, sqlx::Error> {
-        match sqlx::query("UPDATE otp_codes SET is_active = 0 WHERE code = $1 AND is_active = 1 AND expired_at >= CURRENT_DATE")
+        match sqlx::query("UPDATE otp_codes SET is_active = '0' WHERE code = $1 AND is_active = '1' AND expired_at >= CURRENT_TIMESTAMP")
             .bind(code)
             .execute(pool)
             .await

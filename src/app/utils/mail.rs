@@ -7,6 +7,7 @@ use crate::app::auth::models::User;
 
 pub async fn send_mail(
     data: User,
+    subject: &str,
     template: String,
 ) -> Result<<SmtpTransport as Transport>::Ok, <SmtpTransport as Transport>::Error> {
     let host = dotenv::var("MAIL_SMTP_HOST").unwrap();
@@ -26,7 +27,7 @@ pub async fn send_mail(
     let email = Message::builder()
         .from("Karcis.com <noreply@karcis.com>".parse().unwrap())
         .to(recipient.parse().unwrap())
-        .subject("Happy new year")
+        .subject(subject)
         .header(ContentType::TEXT_HTML)
         .body(template)
         .unwrap();
