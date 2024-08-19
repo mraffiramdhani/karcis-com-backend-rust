@@ -87,6 +87,12 @@ pub struct Token {
     pub updated_at: NaiveDateTime,
 }
 
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct Role {
+    pub id: i32,
+    pub name: String,
+}
+
 impl User {
     pub async fn find_by(
         pool: &PgPool,
@@ -232,5 +238,40 @@ impl Token {
             Ok(row) => Ok(row.rows_affected()),
             Err(e) => Err(e),
         }
+    }
+}
+
+impl Role {
+    pub async fn create(
+        transaction: &mut Transaction<'_, Postgres>,
+        role: &str,
+    ) -> Result<Self, sqlx::Error> {
+        let result = sqlx::query_as::<_, Self>("INSERT INTO roles (role) VALUES ($1) RETURNING *")
+            .bind(role)
+            .fetch_one(&mut **transaction)
+            .await;
+        result
+    }
+
+    pub async fn get_by_id(
+        transaction: &mut Transaction<'_, Postgres>,
+        id: &i32,
+    ) -> Result<Self, sqlx::Error> {
+        let result = sqlx::query_as::<_, Self>("SELECT * FROM roles WHERE id = $1")
+            .bind(&id)
+            .fetch_one(&mut **transaction)
+            .await;
+        result
+    }
+
+    pub async fn get_by_name(
+        transaction: &mut Transaction<'_, Postgres>,
+        name: &str,
+    ) -> Result<Self, sqlx::Error> {
+        let result = sqlx::query_as::<_, Self>("SELECT * FROM roles WHERE role = $1")
+            .bind(name)
+            .fetch_one(&mut **transaction)
+            .await;
+        result
     }
 }

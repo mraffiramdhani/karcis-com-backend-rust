@@ -8,6 +8,7 @@ use crate::app::utils::{standard_response::StandardResponse, token_signing::Toke
 use crate::db::DbPool;
 use actix_web::HttpRequest;
 use actix_web::{http::header, web, HttpResponse, Responder};
+use chrono::{Duration, Utc};
 use serde_json::json;
 
 use super::models::{CheckOTP, ForgotPassword, ResetPassword, UpdateProfile};
@@ -40,6 +41,8 @@ pub async fn register(
                         first_name: user.first_name.clone(),
                         last_name: user.last_name.clone(),
                         email: user.email.clone(),
+                        role_id: user.role_id.clone(),
+                        exp: (Utc::now() + Duration::hours(24)).timestamp() as usize,
                     };
                     let token = TokenSigning::sign(token_data).unwrap();
                     match Token::create(&mut tx, &token).await {
@@ -110,6 +113,8 @@ pub async fn login(
                 first_name: user.first_name.clone(),
                 last_name: user.last_name.clone(),
                 email: user.email.clone(),
+                role_id: user.role_id.clone(),
+                exp: (Utc::now() + Duration::hours(24)).timestamp() as usize,
             };
             let token_string = TokenSigning::sign(data).unwrap();
             match pool.begin().await {
