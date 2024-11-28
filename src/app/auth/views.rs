@@ -11,12 +11,18 @@ use actix_web::{http::header, web, HttpResponse, Responder};
 use chrono::{Duration, Utc};
 use serde_json::json;
 
+use super::helper::validate_register_user;
 use super::models::{CheckOTP, ForgotPassword, ResetPassword, UpdateProfile};
 
 pub async fn register(
     pool: web::Data<DbPool>,
     user_data: web::Json<RegisterUser>,
 ) -> impl Responder {
+    //* Check if form submitted is valid */
+    if let Err(e) = validate_register_user(&user_data) {
+        return HttpResponse::BadRequest().json(StandardResponse::<()>::error(e.to_string()));
+    }
+
     // Check if user with the same email or username already exists
     match User::find_by_username_or_email(&pool, &user_data.username, &user_data.email).await {
         Ok(Some(_)) => {
