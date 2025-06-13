@@ -1,0 +1,16 @@
+FROM rust:bookworm
+
+WORKDIR /app
+
+# Install cargo-watch for hot reloading
+RUN cargo install cargo-watch
+
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libssl3 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# The actual source code will be mounted as a volume
+CMD ["cargo", "watch", "-x", "run"] 
