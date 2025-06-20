@@ -17,4 +17,6 @@ RUN apt-get update && \
  
 WORKDIR /app
 COPY --from=builder /app/target/release/karcis-com-backend /app/karcis-com-backend
+# Copy the config directory to the runtime image
+COPY --from=builder /app/config /app/config
 CMD ["/app/karcis-com-backend"]

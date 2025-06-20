@@ -1,0 +1,27 @@
+[server]
+# Development server settings
+host = "0.0.0.0"
+port = 8080
+
+[email]
+# Gmail configuration
+smtp_host = "smtp.gmail.com"
+smtp_port = 587
+smtp_username = "raffi.programming@gmail.com"
+smtp_password = "krjelpzbqdvlnfpy"
+from_email = "noreply@karcis.com"
+from_name = "Karcis.com"
+use_tls = true
+
+# Alternative: Use a different SMTP service for testing
+# smtp_host = "sandbox.smtp.mailtrap.io"
+# smtp_port = 587
+# smtp_username = "6b0cf9fca12b88"
+# smtp_password = "39c1fa8bb05287"
+# from_email = "noreply@karcis.com"
+# from_name = "Karcis.com"
+# use_tls = true
+
+[jwt]
+# Use a development-specific secret
+secret = "dev-secret-key-change-in-production" 

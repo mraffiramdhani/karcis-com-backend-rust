@@ -1,0 +1,33 @@
+[database]
+# Production database settings
+# Note: Most values should be set via environment variables
+max_connections = 20
+
+[server]
+# Production server settings
+host = "0.0.0.0"  # Listen on all interfaces
+workers = 8       # More workers for production
+
+[email]
+# Gmail configuration
+smtp_host = "smtp.gmail.com"
+smtp_port = 587
+smtp_username = "raffi.programming@gmail.com"
+smtp_password = "vgatcegzvqqjnmav"
+from_email = "noreply@karcis.com"
+from_name = "Karcis.com"
+use_tls = true
+
+# Alternative: Use a different SMTP service for testing
+# smtp_host = "sandbox.smtp.mailtrap.io"
+# smtp_port = 587
+# smtp_username = "6b0cf9fca12b88"
+# smtp_password = "39c1fa8bb05287"
+# from_email = "noreply@karcis.com"
+# from_name = "Karcis.com"
+# use_tls = true
+
+[jwt]
+# Production JWT settings
+# Note: Secret should be set via environment variable
+expiration_hours = 24 

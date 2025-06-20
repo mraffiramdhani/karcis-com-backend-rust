@@ -1,0 +1,26 @@
+[database]
+username = "postgres"
+password = "postgres"
+host = "postgres"
+port = 5432
+database_name = "karcis_com"
+max_connections = 5
+
+[server]
+host = "127.0.0.1"
+port = 8080
+workers = 4
+
+[email]
+smtp_host = "smtp.gmail.com"
+smtp_port = 587
+smtp_username = ""
+smtp_password = ""
+from_email = ""
+from_name = "Karcis.com"
+use_tls = true
+
+[jwt]
+secret = "your-secret-key-here"
+expiration_hours = 24
+issuer = "karcis-com" 

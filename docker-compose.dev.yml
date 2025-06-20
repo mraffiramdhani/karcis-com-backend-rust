@@ -37,6 +37,8 @@ services:
       - cargo-cache:/usr/local/cargo/registry
       - target-cache:/app/target
     environment:
+      - APP_ENV=development
+      - APP_KEY=karcis_com-rust
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/karcis_com
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
